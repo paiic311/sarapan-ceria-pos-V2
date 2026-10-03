@@ -34,14 +34,16 @@ const saveAndSharePDF = async (doc, filename) => {
 };
 
 const HistoricalData = () => {
-  const { dailyRecords, vendors } = useStore();
+  const { dailyRecords, vendors, updateEntireDailyRecord } = useStore();
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 7);
     return format(d, 'yyyy-MM-dd');
   });
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [selectedRecord, setSelectedRecord] = useState(null);  
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editData, setEditData] = useState(null);
 
   // Filter records by date range
   const filteredRecords = useMemo(() => {
@@ -103,6 +105,36 @@ const HistoricalData = () => {
 
     return { totalSales, totalProfit, bestVendor };
   }, [filteredRecords, vendors]);
+
+  const handleEditClick = () => {
+    setIsEditMode(true);
+    setEditData(JSON.parse(JSON.stringify(selectedRecord)));
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setEditData(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (window.confirm("Apakah Anda yakin ingin menyimpan perubahan laporan harian ini?")) {
+      await updateEntireDailyRecord(editData.date, editData);
+      setSelectedRecord(editData);
+      setIsEditMode(false);
+    }
+  };
+
+  const handleEditItemChange = (recordIndex, itemIndex, field, value) => {
+    const newData = { ...editData };
+    newData.records[recordIndex].items[itemIndex][field] = value;
+    setEditData(newData);
+  };
+
+  const handleEditNoteChange = (recordIndex, value) => {
+    const newData = { ...editData };
+    newData.records[recordIndex].note = value;
+    setEditData(newData);
+  };
 
   const calculateDayTotal = (dayRecord) => {
     let sales = 0;
@@ -335,23 +367,23 @@ const HistoricalData = () => {
         onClose={() => setSelectedRecord(null)}
         title={`Detail: ${selectedRecord ? format(parseISO(selectedRecord.date), 'dd MMM yyyy') : ''}`}
         footer={
-          <>
-          <button
-            className="btn btn-outline"
-            onClick={() => setSelectedRecord(null)}
-          >
-            Tutup
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => exportDailyPDF(selectedRecord)}
-          >
-            <Download size={18} /> Laporan Harian
-          </button>
-        </>
+          isEditMode ? (
+            <>
+              <button className="btn btn-outline" onClick={handleCancelEdit}>Batal</button>
+              <button className="btn btn-primary" onClick={handleSaveEdit}>Simpan Perubahan</button>
+            </>
+          ) : (
+            <>
+              <button className="btn btn-outline" onClick={() => { setSelectedRecord(null); setIsEditMode(false); }}>Tutup</button>
+              <button className="btn btn-outline" onClick={handleEditClick}>Edit Data</button>
+              <button className="btn btn-primary" onClick={() => exportDailyPDF(selectedRecord)}>
+                <Download size={18} /> Laporan Harian
+              </button>
+            </>
+          )
         }
       >
-        {selectedRecord && (
+        {selectedRecord && !isEditMode && (
           <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
              {selectedRecord.records.map((record, i) => (
               <div key={record.id} style={{ marginBottom: i === selectedRecord.records.length - 1 ? 0 : 20, paddingBottom: i === selectedRecord.records.length - 1 ? 0 : 20, borderBottom: i === selectedRecord.records.length - 1 ? 'none' : '1px solid var(--border)' }}>
@@ -412,6 +444,81 @@ const HistoricalData = () => {
                     </div>
                   );
                 })}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {selectedRecord && isEditMode && editData && (
+          <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '4px' }}>
+            {editData.records.map((record, i) => (
+              <div key={record.id} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <h4 className="font-bold" style={{ margin: 0 }}>{getVendorName(record.vendorId)}</h4>
+                  {record.isHandedOver && (
+                    <span style={{
+                      background: 'rgba(16, 185, 129, 0.1)',
+                      color: '#10b981',
+                      border: '1px solid rgba(16, 185, 129, 0.2)',
+                      padding: '4px 8px',
+                      borderRadius: '50px',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <CheckCircle2 size={12} />
+                      Uang Diserahkan (Terkunci)
+                    </span>
+                  )}
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+                    <label className="form-label mb-0" style={{ fontSize: '0.8rem' }}>Catatan Vendor (Opsional)</label>
+                    <textarea 
+                      className="form-input" 
+                      value={record.note || ''}
+                      onChange={(e) => handleEditNoteChange(i, e.target.value)}
+                      style={{ minHeight: '60px', resize: 'vertical' }}
+                      disabled={record.isHandedOver}
+                    />
+                </div>
+
+                <div>
+                  <div className="item-row" style={{ padding: '0 8px 8px', borderBottom: 'none', background: 'transparent', display: window.innerWidth > 1024 ? 'grid' : 'none', gridTemplateColumns: '2fr 1fr 1fr 1.5fr 1.5fr', gap: '12px' }}>
+                    <div className="form-label mb-0">Produk</div>
+                    <div className="form-label mb-0">Titip</div>
+                    <div className="form-label mb-0">Terjual</div>
+                    <div className="form-label mb-0">Harga Modal (Rp)</div>
+                    <div className="form-label mb-0">Harga Jual (Rp)</div>
+                  </div>
+                  
+                  {record.items.map((item, idx) => (
+                    <div key={idx} className="item-row" style={{ gridTemplateColumns: '2fr 1fr 1fr 1.5fr 1.5fr', gap: '12px', padding: window.innerWidth <= 1024 ? '16px' : '8px', borderBottom: '1px solid var(--border)' }}>
+                      <div className="form-group mb-0" style={{ display: 'flex', flexDirection: window.innerWidth <= 1024 ? 'column' : 'row', alignItems: window.innerWidth <= 1024 ? 'flex-start' : 'center' }}>
+                        {window.innerWidth <= 1024 && <label className="form-label">Produk</label>}
+                        <div style={{ fontWeight: 'bold' }}>{item.productName || 'Produk'}</div>
+                      </div>
+                      <div className="form-group mb-0">
+                        {window.innerWidth <= 1024 && <label className="form-label">Titip</label>}
+                        <input type="number" className="form-input" value={item.qtyTitip === 0 ? '' : item.qtyTitip} onChange={e => handleEditItemChange(i, idx, 'qtyTitip', Number(e.target.value))} disabled={record.isHandedOver} />
+                      </div>
+                      <div className="form-group mb-0">
+                        {window.innerWidth <= 1024 && <label className="form-label">Terjual</label>}
+                        <input type="number" className="form-input" value={item.qtySold === 0 ? '' : item.qtySold} onChange={e => handleEditItemChange(i, idx, 'qtySold', Number(e.target.value))} disabled={record.isHandedOver} />
+                      </div>
+                      <div className="form-group mb-0">
+                        {window.innerWidth <= 1024 && <label className="form-label">Harga Modal</label>}
+                        <input type="number" className="form-input" value={item.basePrice === 0 ? '' : item.basePrice} onChange={e => handleEditItemChange(i, idx, 'basePrice', Number(e.target.value))} disabled={record.isHandedOver} />
+                      </div>
+                      <div className="form-group mb-0">
+                        {window.innerWidth <= 1024 && <label className="form-label">Harga Jual</label>}
+                        <input type="number" className="form-input" value={item.salePrice === 0 ? '' : item.salePrice} onChange={e => handleEditItemChange(i, idx, 'salePrice', Number(e.target.value))} disabled={record.isHandedOver} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>

@@ -340,7 +340,6 @@ const Dashboard = () => {
                           placeholder="Tambahkan catatan khusus untuk hari ini..."
                           value={record.note || ''}
                           onChange={(e) => updateDailyRecordNote(todayDate, record.id, e.target.value)}
-                          onFocus={() => console.log('TEXTAREA FOCUS')}
                           style={{ minHeight: '60px', resize: 'vertical' }}
                           disabled={record.isHandedOver}
                         />

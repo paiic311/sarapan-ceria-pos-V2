@@ -81,7 +81,13 @@ const Vendors = () => {
                     <button className="btn-icon" onClick={() => openEditModal(vendor)}>
                       <Edit2 size={18} />
                     </button>
-                    <button className="btn-icon danger" onClick={() => deleteVendor(vendor.id)}>
+                    <button className="btn-icon danger" onClick={() => {const yakin = window.confirm(
+                      `Apakah Anda yakin ingin menghapus vendor "${vendor.name}"?`
+                    );
+                    if (yakin) {
+                      deleteVendor(vendor.id);
+                    }
+                    }}>
                       <Trash2 size={18} />
                     </button>
                   </td>

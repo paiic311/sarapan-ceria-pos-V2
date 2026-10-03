@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Save, RefreshCw, Trash2, ShieldAlert } from 'lucide-react';
 import { useStore, syncWithServer } from '../store/useStore';
 import localforage from 'localforage';
+import { API_URL } from '../config';
 
 const Settings = () => {
   const { isOffline, initData } = useStore();
@@ -28,12 +29,30 @@ const Settings = () => {
   };
 
   const handleClearData = async () => {
-    if (window.confirm("Apakah Anda yakin ingin menghapus SEMUA data lokal? Tindakan ini tidak dapat dibatalkan.")) {
-      await localforage.clear();
-      await initData();
-      alert("Data lokal berhasil dihapus.");
+  if (!window.confirm(
+    "PERINGATAN!\n\nSemua data akan dihapus dari database dan perangkat.\n\nTindakan ini tidak dapat dibatalkan.\n\nLanjutkan?"
+  )) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/reset-all-data`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      throw new Error('Gagal menghapus data dari server');
     }
-  };
+
+    await localforage.clear();
+    await initData();
+
+    alert('Semua data berhasil dihapus.');
+  } catch (error) {
+    console.error(error);
+    alert('Gagal menghapus semua data.');
+  }
+};
 
   return (
     <div style={{ maxWidth: 800 }}>
@@ -65,7 +84,7 @@ const Settings = () => {
         <p className="text-muted mb-6">Tindakan di sini bersifat permanen dan tidak dapat dibatalkan.</p>
         
         <button className="btn btn-danger" onClick={handleClearData}>
-          <Trash2 size={18} /> Hapus Semua Data Lokal
+          <Trash2 size={18} /> Hapus Semua Data
         </button>
       </div>
       
